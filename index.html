@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jogo de Categorização - Animais</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+    }
+    
+    .draggable {
+      cursor: move;
+      transition: all 0.3s ease;
+    }
+    
+    .draggable:hover {
+      transform: scale(1.05);
+    }
+    
+    .dragging {
+      opacity: 0.5;
+      transform: rotate(5deg);
+    }
+    
+    .drop-zone {
+      transition: all 0.3s ease;
+    }
+    
+    .drop-zone.drag-over {
+      transform: scale(1.02);
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+    }
+    
+    .item-card {
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-10px); }
+      75% { transform: translateX(10px); }
+    }
+    
+    .correct-animation {
+      animation: bounce 0.5s ease;
+    }
+    
+    .incorrect-animation {
+      animation: shake 0.3s ease;
+    }
+    
+    .progress-bar {
+      transition: width 0.5s ease;
+    }
+  </style>
+ </head>
+ <body class="h-full">
+  <div class="h-full w-full overflow-auto bg-gradient-to-br from-blue-50 to-purple-50">
+   <div class="w-full max-w-6xl mx-auto p-6"><!-- Header -->
+    <div class="text-center mb-8">
+     <h1 id="gameTitle" class="text-4xl font-bold text-gray-800 mb-2">🐾 Classifique os Animais</h1>
+     <p id="instructions" class="text-lg text-gray-600">Arraste cada animal para a categoria correta!</p>
+    </div><!-- Progress Bar -->
+    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+     <div class="flex justify-between items-center mb-2"><span class="text-sm font-semibold text-gray-700">Progresso</span> <span id="progressText" class="text-sm font-semibold text-blue-600">0 / 9</span>
+     </div>
+     <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+      <div id="progressBar" class="progress-bar bg-gradient-to-r from-blue-500 to-purple-500 h-full rounded-full" style="width: 0%"></div>
+     </div>
+    </div><!-- Game Area -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6"><!-- Items to Drag -->
+     <div class="bg-white rounded-xl shadow-lg p-6">
+      <h2 class="text-2xl font-bold text-gray-800 mb-4">🎯 Animais para Classificar</h2>
+      <div id="itemsContainer" class="grid grid-cols-2 gap-3 min-h-[400px]"><!-- Items will be added here by JavaScript -->
+      </div>
+     </div><!-- Drop Zones -->
+     <div class="space-y-4">
+      <div id="dropZone1" class="drop-zone bg-gradient-to-br from-green-100 to-green-50 rounded-xl shadow-lg p-6 min-h-[150px] border-3 border-dashed border-green-300">
+       <h3 class="text-xl font-bold text-green-800 mb-3">🦁 Mamíferos</h3>
+       <div class="grid grid-cols-2 gap-2"><!-- Dropped items will appear here -->
+       </div>
+      </div>
+      <div id="dropZone2" class="drop-zone bg-gradient-to-br from-orange-100 to-orange-50 rounded-xl shadow-lg p-6 min-h-[150px] border-3 border-dashed border-orange-300">
+       <h3 class="text-xl font-bold text-orange-800 mb-3">🦎 Répteis</h3>
+       <div class="grid grid-cols-2 gap-2"><!-- Dropped items will appear here -->
+       </div>
+      </div>
+      <div id="dropZone3" class="drop-zone bg-gradient-to-br from-blue-100 to-blue-50 rounded-xl shadow-lg p-6 min-h-[150px] border-3 border-dashed border-blue-300">
+       <h3 class="text-xl font-bold text-blue-800 mb-3">🐸 Anfíbios</h3>
+       <div class="grid grid-cols-2 gap-2"><!-- Dropped items will appear here -->
+       </div>
+      </div>
+     </div>
+    </div><!-- Feedback Message -->
+    <div id="feedbackMessage" class="mt-6 text-center text-lg font-semibold h-8"></div><!-- Reset Button -->
+    <div class="text-center mt-6"><button id="resetButton" class="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105"> 🔄 Reiniciar Jogo </button>
+    </div>
+   </div>
+  </div>
+  <script>
+    const defaultConfig = {
+      game_title: "🐾 Classifique os Animais",
+      instructions: "Arraste cada animal para a categoria correta!",
+      correct_message: "🎉 Muito bem! Resposta correta!",
+      completion_message: "🏆 Parabéns! Você completou o jogo!"
+    };
+
+    const animals = [
+      { id: 1, name: "Cachorro", emoji: "🐕", category: "dropZone1" },
+      { id: 2, name: "Gato", emoji: "🐈", category: "dropZone1" },
+      { id: 3, name: "Elefante", emoji: "🐘", category: "dropZone1" },
+      { id: 4, name: "Cobra", emoji: "🐍", category: "dropZone2" },
+      { id: 5, name: "Jacaré", emoji: "🐊", category: "dropZone2" },
+      { id: 6, name: "Tartaruga", emoji: "🐢", category: "dropZone2" },
+      { id: 7, name: "Sapo", emoji: "🐸", category: "dropZone3" },
+      { id: 8, name: "Salamandra", emoji: "🦎", category: "dropZone3" },
+      { id: 9, name: "Rã", emoji: "🐸", category: "dropZone3" }
+    ];
+
+    let correctCount = 0;
+    let draggedElement = null;
+    let touchStartElement = null;
+    let touchStartY = 0;
+    let touchStartX = 0;
+
+    function initializeGame() {
+      const itemsContainer = document.getElementById('itemsContainer');
+      itemsContainer.innerHTML = '';
+      correctCount = 0;
+      updateProgress();
+
+      const shuffled = [...animals].sort(() => Math.random() - 0.5);
+
+      shuffled.forEach(animal => {
+        const card = document.createElement('div');
+        card.className = 'item-card draggable bg-white rounded-lg shadow-md p-4 text-center border-2 border-gray-200';
+        card.draggable = true;
+        card.dataset.id = animal.id;
+        card.dataset.category = animal.category;
+        card.innerHTML = `
+          <div class="text-4xl mb-2">${animal.emoji}</div>
+          <div class="text-sm font-semibold text-gray-700">${animal.name}</div>
+        `;
+
+        card.addEventListener('dragstart', handleDragStart);
+        card.addEventListener('dragend', handleDragEnd);
+        card.addEventListener('touchstart', handleTouchStart);
+        card.addEventListener('touchmove', handleTouchMove);
+        card.addEventListener('touchend', handleTouchEnd);
+
+        itemsContainer.appendChild(card);
+      });
+
+      const dropZones = document.querySelectorAll('.drop-zone');
+      dropZones.forEach(zone => {
+        const itemsDiv = zone.querySelector('div:last-child');
+        itemsDiv.innerHTML = '';
+      });
+
+      document.getElementById('feedbackMessage').textContent = '';
+    }
+
+    function handleDragStart(e) {
+      draggedElement = e.currentTarget;
+      draggedElement.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/html', draggedElement.innerHTML);
+    }
+
+    function handleDragEnd(e) {
+      e.currentTarget.classList.remove('dragging');
+    }
+
+    // ===== TOUCH HANDLERS (para celular) =====
+    function handleTouchStart(e) {
+      touchStartElement = e.currentTarget;
+      touchStartElement.classList.add('dragging');
+      touchStartY = e.touches[0].clientY;
+      touchStartX = e.touches[0].clientX;
+    }
+
+    function handleTouchMove(e) {
+      e.preventDefault();
+    }
+
+    function handleTouchEnd(e) {
+      if (!touchStartElement) return;
+      
+      const endY = e.changedTouches[0].clientY;
+      const endX = e.changedTouches[0].clientX;
+      
+      touchStartElement.classList.remove('dragging');
+      
+      // Encontra a drop zone sob o ponto de toque
+      const dropZones = document.querySelectorAll('.drop-zone');
+      let targetZone = null;
+      
+      for (let zone of dropZones) {
+        const rect = zone.getBoundingClientRect();
+        if (endX >= rect.left && endX <= rect.right && 
+            endY >= rect.top && endY <= rect.bottom) {
+          targetZone = zone;
+          break;
+        }
+      }
+      
+      if (targetZone) {
+        draggedElement = touchStartElement;
+        const correctCategory = draggedElement.dataset.category;
+        const droppedCategory = targetZone.id;
+
+        if (correctCategory === droppedCategory) {
+          showFeedback(defaultConfig.correct_message, 'correct');
+          
+          draggedElement.classList.add('correct-animation');
+          draggedElement.draggable = false;
+          draggedElement.classList.remove('draggable');
+          draggedElement.style.cursor = 'default';
+          draggedElement.style.touchAction = 'none';
+          
+          const itemsDiv = targetZone.querySelector('div:last-child');
+          itemsDiv.appendChild(draggedElement);
+          
+          correctCount++;
+          updateProgress();
+
+          if (correctCount === animals.length) {
+            setTimeout(() => {
+              showFeedback(defaultConfig.completion_message, 'complete');
+            }, 500);
+          }
+        } else {
+          showFeedback('❌ Ops! Tente novamente!', 'incorrect');
+          draggedElement.classList.add('incorrect-animation');
+          setTimeout(() => {
+            draggedElement.classList.remove('incorrect-animation');
+          }, 300);
+        }
+      }
+      
+      touchStartElement = null;
+      draggedElement = null;
+    }
+
+    // ===== DRAG HANDLERS (para desktop) =====
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const dropZone = e.currentTarget;
+      dropZone.classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      const dropZone = e.currentTarget;
+      dropZone.classList.remove('drag-over');
+
+      if (!draggedElement) return;
+
+      const correctCategory = draggedElement.dataset.category;
+      const droppedCategory = dropZone.id;
+
+      if (correctCategory === droppedCategory) {
+        showFeedback(defaultConfig.correct_message, 'correct');
+        
+        draggedElement.classList.add('correct-animation');
+        draggedElement.draggable = false;
+        draggedElement.classList.remove('draggable');
+        draggedElement.style.cursor = 'default';
+        
+        const itemsDiv = dropZone.querySelector('div:last-child');
+        itemsDiv.appendChild(draggedElement);
+        
+        correctCount++;
+        updateProgress();
+
+        if (correctCount === animals.length) {
+          setTimeout(() => {
+            showFeedback(defaultConfig.completion_message, 'complete');
+          }, 500);
+        }
+      } else {
+        showFeedback('❌ Ops! Tente novamente!', 'incorrect');
+        draggedElement.classList.add('incorrect-animation');
+        setTimeout(() => {
+          draggedElement.classList.remove('incorrect-animation');
+        }, 300);
+      }
+
+      draggedElement = null;
+    }
+
+    function showFeedback(message, type) {
+      const feedbackEl = document.getElementById('feedbackMessage');
+      feedbackEl.textContent = message;
+      
+      if (type === 'correct') {
+        feedbackEl.className = 'mt-6 text-center text-lg font-semibold h-8 text-green-600';
+      } else if (type === 'incorrect') {
+        feedbackEl.className = 'mt-6 text-center text-lg font-semibold h-8 text-red-600';
+      } else if (type === 'complete') {
+        feedbackEl.className = 'mt-6 text-center text-2xl font-bold h-8 text-purple-600';
+      }
+
+      setTimeout(() => {
+        if (type !== 'complete') {
+          feedbackEl.textContent = '';
+        }
+      }, 2000);
+    }
+
+    function updateProgress() {
+      const progressText = document.getElementById('progressText');
+      const progressBar = document.getElementById('progressBar');
+      const percentage = (correctCount / animals.length) * 100;
+      
+      progressText.textContent = `${correctCount} / ${animals.length}`;
+      progressBar.style.width = `${percentage}%`;
+    }
+
+    const dropZones = document.querySelectorAll('.drop-zone');
+    dropZones.forEach(zone => {
+      zone.addEventListener('dragover', handleDragOver);
+      zone.addEventListener('dragleave', handleDragLeave);
+      zone.addEventListener('drop', handleDrop);
+    });
+
+    document.getElementById('resetButton').addEventListener('click', initializeGame);
+
+    // Inicializa o jogo ao carregar
+    initializeGame();
+  </script>
+ </body>
+</html>
